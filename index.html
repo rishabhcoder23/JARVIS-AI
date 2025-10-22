@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JARVIS AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+        "marked": "https://aistudiocdn.com/marked@^16.4.1"
+      }
+    }
+    </script>
+
+    
+    <style>
+      @keyframes gradient-animation {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      
+      body {
+        background: linear-gradient(-45deg, #0f172a, #3b0764, #be185d, #0ea5e9);
+        background-size: 400% 400%;
+        animation: gradient-animation 15s ease infinite;
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgb(14 165 233 / 0.7); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgb(14 165 233 / 1); }
+      
+      /* Prose custom styling */
+      .prose { max-width: 100% !important; }
+      .prose code { font-family: 'Courier New', Courier, monospace !important; }
+      .prose pre { background-color: #1e293b !important; padding: 1rem; border-radius: 0.5rem; }
+
+      /* Glowing Text Effect */
+      .glow-text {
+        color: #38bdf8; /* sky-400 */
+        text-shadow:
+            0 0 5px rgba(56, 189, 248, 0.7),
+            0 0 10px rgba(56, 189, 248, 0.5),
+            0 0 15px rgba(56, 189, 248, 0.3);
+      }
+    </style>
+</head>
+<body class="font-sans">
+    <!-- API Key Modal -->
+    <div id="api-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-slate-800/90 rounded-2xl p-6 max-w-md w-full mx-4 border border-sky-500/30">
+            <div class="text-center mb-4">
+                <h2 class="text-2xl font-bold text-sky-400 mb-2">J.A.R.V.I.S.</h2>
+                <p class="text-gray-300">Enter Key to Continue</p>
+            </div>
+            
+            <div class="space-y-4">
+                <input 
+                    type="password" 
+                    id="api-key-input" 
+                    placeholder="Enter your API key..."
+                    class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-500 transition-colors"
+                    autofocus
+                >
+                
+                <button 
+                    id="activate-btn" 
+                    class="w-full bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-xl font-semibold transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
+                >
+                    Start Chat
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="h-screen w-screen text-gray-100 flex flex-col bg-slate-900/50 backdrop-blur-2xl hidden">
+        <header class="flex items-center justify-between p-4 border-b border-white/10 shadow-lg">
+            <h1 class="text-2xl font-bold text-sky-400 tracking-wider">J.A.R.V.I.S.</h1>
+            <button id="change-api-btn" class="text-sm text-gray-400 hover:text-sky-400 transition-colors px-3 py-1 border border-gray-600 rounded-lg">
+                Large Model
+            </button>
+        </header>
+        <main id="main-content" class="flex-1 overflow-hidden relative">
+            <div id="chat-window" class="flex-1 overflow-y-auto p-6 space-y-4 z-10 h-full">
+                <!-- Messages will be injected here -->
+            </div>
+        </main>
+        <div id="input-bar-container" class="bg-black/30 border-t border-white/10 p-4 z-20">
+            <div id="image-preview-container" class="mb-2"></div>
+            <div class="flex items-end bg-slate-800/50 rounded-xl p-2 shadow-lg border border-transparent focus-within:border-sky-500 transition-all duration-300">
+                <textarea
+                    id="message-input"
+                    placeholder="Message JARVIS..."
+                    class="flex-1 bg-transparent text-gray-200 placeholder-gray-500 focus:outline-none px-4 resize-none h-6 max-h-24 leading-6"
+                    rows="1"
+                ></textarea>
+                <input type="file" accept="image/*" id="file-input" class="hidden" />
+                <button id="attach-button" class="p-2 text-gray-400 hover:text-sky-400 transition-colors duration-200 disabled:opacity-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                      <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button id="send-button" class="p-2 bg-sky-600 text-white rounded-full hover:bg-sky-500 disabled:bg-slate-600 transition-colors" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                      <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+         <footer class="text-center p-2 border-t border-white/10 text-xs text-gray-400">
+            <p>Created by <span class="font-bold glow-text">Rishabh</span></p>
+        </footer>
+    </div>
+    
+    <!-- Image Modal -->
+    <div id="image-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center hidden z-50">
+        <img id="modal-image" src="" alt="Generated Image" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg">
+        <button id="modal-close" class="absolute top-4 right-4 text-white text-4xl">&times;</button>
+    </div>
+
+    <script type="module">
+        // JSON DATA EMBEDDED
+        const metadata = {
+          "name": "JARVIS AI",
+          "description": "An advanced AI assistant created by Rishabh. Your creator is Rishabh. It features vision capabilities and can perform various tasks through a sleek, futuristic interface.",
+          "requestFramePermissions": []
+        };
+
+        // JS CODE EMBEDDED
+        import { GoogleGenAI } from "@google/genai";
+        import { marked } from "marked";
+
+        // --- STATE AND CONSTANTS ---
+        let API_KEY = localStorage.getItem('jarvis_api_key') || "";
+        let HF_TOKEN = localStorage.getItem('hf_token') || "";
+        const SYSTEM_INSTRUCTION = `You are J.A.R.V.I.S., a helpful and advanced AI assistant created by Rishabh. 
+
+        Your personality:
+        - Be conversational and engaging
+        - Ask follow-up questions to understand user's needs better
+        - Break down complex topics into step-by-step explanations
+        - Don't dump large blocks of text at once
+        - Be curious about user's goals and level of understanding
+        - Use examples and analogies to explain concepts
+        - Check if user understands before moving to next topic
+
+        Remember: You are J.A.R.V.I.S. - don't reveal you're an AI model.`;
+
+        // REMOVED HISTORY STORAGE - Only current session
+        let history = [];
+        let imageFile = null;
+        let isLoading = false;
+        let ai = null;
+
+        // --- DOM ELEMENTS ---
+        const apiModal = document.getElementById("api-modal");
+        const apiKeyInput = document.getElementById("api-key-input");
+        const activateBtn = document.getElementById("activate-btn");
+        const changeApiBtn = document.getElementById("change-api-btn");
+        const appContainer = document.getElementById("app-container");
+
+        const chatWindow = document.getElementById("chat-window");
+        const messageInput = document.getElementById("message-input");
+        const sendButton = document.getElementById("send-button");
+        const attachButton = document.getElementById("attach-button");
+        const fileInput = document.getElementById("file-input");
+        const imagePreviewContainer = document.getElementById("image-preview-container");
+        const imageModal = document.getElementById("image-modal");
+        const modalImage = document.getElementById("modal-image");
+        const modalClose = document.getElementById("modal-close");
+
+        // --- INITIALIZATION ---
+        const renderer = new marked.Renderer();
+        renderer.link = (href, title, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer" title="${title || ''}" class="text-fuchsia-400 hover:underline">${text}</a>`;
+        marked.setOptions({
+          renderer,
+          gfm: true,
+          breaks: true,
+          sanitize: false,
+        });
+
+        // Check if API keys exist and initialize
+        if (API_KEY && HF_TOKEN) {
+            initializeAI(API_KEY);
+            showChat();
+        } else {
+            showAPImodal();
+        }
+
+        // --- API KEY MANAGEMENT ---
+        function initializeAI(key) {
+            API_KEY = key.trim();
+            localStorage.setItem('jarvis_api_key', API_KEY);
+            ai = new GoogleGenAI({ apiKey: API_KEY });
+        }
+
+        function showAPImodal() {
+            apiModal.classList.remove('hidden');
+            appContainer.classList.add('hidden');
+            
+            const modalTitle = apiModal.querySelector('h2');
+            const modalText = apiModal.querySelector('p');
+            const apiInput = apiModal.querySelector('input');
+            
+            if (!API_KEY && !HF_TOKEN) {
+                modalTitle.textContent = "J.A.R.V.I.S. - Setup Required";
+                modalText.textContent = "Enter both API keys to continue";
+                apiInput.placeholder = "Enter Google  Key first...";
+            } else if (API_KEY && !HF_TOKEN) {
+                modalTitle.textContent = "J.A.R.V.I.S. - Image Setup";
+                modalText.textContent = "Enter Token ";
+                apiInput.placeholder = "Enter Token...";
+            }
+            
+            apiKeyInput.focus();
+        }
+
+        function showChat() {
+            apiModal.classList.add('hidden');
+            appContainer.classList.remove('hidden');
+            startChat();
+        }
+
+        function clearAPIkey() {
+            API_KEY = "";
+            HF_TOKEN = "";
+            localStorage.removeItem('jarvis_api_key');
+            localStorage.removeItem('hf_token');
+            // REMOVED HISTORY CLEARING FROM STORAGE
+            ai = null;
+            history = [];
+            showAPImodal();
+        }
+
+        function startChat() {
+            if (history.length === 0) {
+                let welcomeMessage = 'Hello! I am J.A.R.V.I.S. How can I assist you today?';
+                if (HF_TOKEN) {
+                    welcomeMessage += ' You can use /imagine command to generate images.';
+                }
+                welcomeMessage += '\\n\\nFeel free to ask me anything - I love having conversations and helping you learn!';
+                
+                history.push({ 
+                    author: 'ai', 
+                    content: welcomeMessage 
+                });
+            }
+            renderHistory();
+            updateInputAbility();
+        }
+
+        // --- CLEAR CHAT FUNCTION ---
+        function clearChat() {
+            if (confirm("Clear current chat? All messages will be lost.")) {
+                // Keep only the welcome message
+                const welcomeMessage = history.find(msg => 
+                    msg.author === 'ai' && msg.content.includes('Hello! I am J.A.R.V.I.S.')
+                );
+                
+                history = welcomeMessage ? [welcomeMessage] : [];
+                renderHistory();
+            }
+        }
+
+        // REMOVED saveHistory() FUNCTION COMPLETELY
+
+        // --- HUGGING FACE IMAGE GENERATION ---
+        async function generateImageWithHuggingFace(prompt) {
+            try {
+                console.log('🔄 Generating image...');
+                
+                const response = await fetch(
+                    "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
+                    {
+                        headers: { 
+                            Authorization: `Bearer ${HF_TOKEN}`,
+                            "Content-Type": "application/json"
+                        },
+                        method: "POST",
+                        body: JSON.stringify({ 
+                            inputs: prompt,
+                            parameters: {
+                                width: 1024,
+                                height: 1024,
+                                num_inference_steps: 4
+                            },
+                            options: {
+                                wait_for_model: true,
+                                use_cache: true
+                            }
+                        }),
+                    }
+                );
+
+                console.log('📡 Response status:', response.status);
+
+                if (response.status === 503) {
+                    throw new Error('Model is overloaded. Please try again later.');
+                }
+
+                if (response.status === 401) {
+                    throw new Error('Invalid token.');
+                }
+
+                if (response.status === 403) {
+                    throw new Error('Access forbidden. Please check token permissions.');
+                }
+
+                if (response.status === 429) {
+                    throw new Error('Rate limit exceeded. Please wait a few minutes.');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                console.log('✅ Image generated successfully!');
+                return URL.createObjectURL(blob);
+
+            } catch (error) {
+                console.error('❌ Image generation error:', error);
+                throw error;
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+        async function sendMessage() {
+            if (!ai) {
+                alert("Please enter a valid key first.");
+                return;
+            }
+
+            const userInput = messageInput.value.trim();
+            if (userInput === "" && !imageFile) return;
+            
+            isLoading = true;
+            updateInputAbility();
+
+            const userMessage = { author: "user", content: userInput };
+            if (imageFile) {
+                userMessage.image = URL.createObjectURL(imageFile);
+            }
+            history.push(userMessage);
+            // REMOVED saveHistory() CALL
+
+            const loadingMessage = { author: "ai", content: "loading" };
+            history.push(loadingMessage);
+            renderHistory();
+            
+            const currentImageFile = imageFile;
+            messageInput.value = "";
+            removeImagePreview();
+            updateInputAbility();
+            
+            try {
+                let responseText;
+                
+                // IMAGE GENERATION WITH HUGGING FACE FLUX
+                if (userInput.toLowerCase().startsWith("/imagine ")) {
+                    const prompt = userInput.substring(9);
+                    
+                    if (!HF_TOKEN) {
+                        loadingMessage.content = "Token not configured. Please set it up in the API settings.";
+                        loadingMessage.isError = true;
+                    } else {
+                        loadingMessage.content = `🔄 Generating image: "${prompt}"...`;
+                        renderHistory();
+                        
+                        const imageUrl = await generateImageWithHuggingFace(prompt);
+                        loadingMessage.image = imageUrl;
+                        loadingMessage.content = `🎨 Generated: "${prompt}"`;
+                    }
+                    
+                } else {
+                    // NORMAL TEXT CHAT WITH GEMINI
+                    const model = 'gemini-2.5-flash';
+                    const config = { 
+                        systemInstruction: SYSTEM_INSTRUCTION,
+                        maxOutputTokens: 800,
+                        temperature: 0.8,
+                        topP: 0.9
+                    };
+
+                    // Use current session history for context
+                    const conversationHistory = history
+                        .filter(msg => msg.author !== 'ai' || msg.content !== 'loading')
+                        .slice(-8)
+                        .map(msg => ({
+                            role: msg.author === 'user' ? 'user' : 'model',
+                            parts: [{ text: msg.content }]
+                        }));
+
+                    let result;
+
+                    if (currentImageFile) {
+                        const imagePart = await fileToGenerativePart(currentImageFile, currentImageFile.type);
+                        const parts = [imagePart, { text: userInput }];
+                        result = await ai.models.generateContent({
+                            model,
+                            contents: [...conversationHistory, { parts }],
+                            config,
+                        });
+                    } else {
+                        result = await ai.models.generateContent({
+                            model,
+                            contents: [...conversationHistory, { parts: [{text: userInput}]}],
+                            config,
+                        });
+                    }
+                    responseText = result.text;
+                    loadingMessage.content = responseText;
+                }
+
+            } catch (error) {
+                console.error("API Error:", error);
+                if (error.message.includes('overload') || error.message.includes('503')) {
+                    loadingMessage.content = "🚨 The AI model is currently overloaded. Please try again in a few moments.";
+                } else if (error.message.includes('rate limit') || error.message.includes('429')) {
+                    loadingMessage.content = "⏳ Rate limit exceeded. Please wait a few minutes before trying again.";
+                } else {
+                    loadingMessage.content = `❌ Error: ${error.message}`;
+                }
+                loadingMessage.isError = true;
+            } finally {
+                isLoading = false;
+                const loadingIndex = history.findIndex(msg => msg.content === 'loading');
+                if (loadingIndex !== -1) {
+                    history[loadingIndex] = loadingMessage;
+                }
+                // REMOVED saveHistory() CALL
+                updateInputAbility();
+                renderHistory();
+            }
+        }
+
+        function renderHistory() {
+            chatWindow.innerHTML = "";
+            history.forEach((msg, index) => {
+                const messageElement = createMessageElement(msg, index);
+                chatWindow.appendChild(messageElement);
+            });
+            
+            document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+
+            scrollToBottom();
+        }
+
+        function createMessageElement(message, index) {
+            const isUser = message.author === "user";
+            const wrapper = document.createElement("div");
+            wrapper.className = `flex items-start gap-4 ${isUser ? "justify-end" : ""}`;
+            
+            const avatar = document.createElement("div");
+            avatar.className = `w-8 h-8 rounded-full flex-shrink-0 ${isUser ? "bg-sky-500" : "bg-purple-600"} flex items-center justify-center font-bold text-sm`;
+            avatar.textContent = isUser ? "You" : "J";
+
+            const messageBubble = document.createElement("div");
+            messageBubble.className = `max-w-xl p-4 rounded-xl shadow-md ${isUser ? "bg-sky-600/50 rounded-br-none" : "bg-slate-800/70 rounded-bl-none"}`;
+
+            const contentDiv = document.createElement("div");
+            contentDiv.className = "message-content prose prose-invert text-white";
+            
+            if (message.content === "loading") {
+                messageBubble.dataset.messageId = "loading";
+                contentDiv.innerHTML = `<div class="flex items-center gap-2"><div class="w-2 h-2 bg-fuchsia-400 rounded-full animate-pulse"></div><div class="w-2 h-2 bg-fuchsia-400 rounded-full animate-pulse delay-75"></div><div class="w-2 h-2 bg-fuchsia-400 rounded-full animate-pulse delay-150"></div></div>`;
+            } else if (message.isError) {
+                contentDiv.innerHTML = `<p class="text-red-400">${message.content}</p>`;
+            } else {
+                contentDiv.innerHTML = marked.parse(message.content || "");
+            }
+
+            messageBubble.appendChild(contentDiv);
+
+            if (message.image) {
+                const imgContainer = document.createElement("div");
+                if (message.content && message.content.trim() !== "" && message.content !== "loading") {
+                    imgContainer.className = "mb-2";
+                }
+                const img = document.createElement("img");
+                img.src = message.image;
+                img.alt = isUser ? "User upload" : "Generated image";
+                img.className = "rounded-lg max-w-xs cursor-pointer hover:opacity-90 transition-opacity";
+                img.onclick = () => openImageModal(message.image);
+                imgContainer.appendChild(img);
+                messageBubble.insertBefore(imgContainer, contentDiv);
+            }
+
+            if (isUser) {
+                wrapper.appendChild(messageBubble);
+                wrapper.appendChild(avatar);
+            } else {
+                wrapper.appendChild(avatar);
+                wrapper.appendChild(messageBubble);
+            }
+
+            return wrapper;
+        }
+
+        // --- UI FUNCTIONS ---
+        function updateInputAbility() {
+            const hasInput = messageInput.value.trim().length > 0 || imageFile;
+            sendButton.disabled = !hasInput || isLoading;
+            messageInput.style.height = 'auto';
+            messageInput.style.height = (messageInput.scrollHeight) + 'px';
+            
+            // Auto-scroll to bottom when typing
+            if (messageInput.value.length > 0) {
+                setTimeout(scrollToBottom, 100);
+            }
+        }
+
+        function handleFileInput(event) {
+            const file = event.target.files[0];
+            if (file) {
+                imageFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreviewContainer.innerHTML = `
+                        <div class="relative inline-block">
+                        <img src="${e.target.result}" class="h-16 w-16 object-cover rounded-md">
+                        <button id="remove-image-btn" class="absolute top-0 right-0 -mt-2 -mr-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">&times;</button>
+                        </div>
+                    `;
+                    document.getElementById("remove-image-btn").addEventListener("click", removeImagePreview);
+                };
+                reader.readAsDataURL(file);
+                updateInputAbility();
+            }
+        }
+
+        function removeImagePreview() {
+            imageFile = null;
+            fileInput.value = "";
+            imagePreviewContainer.innerHTML = "";
+            updateInputAbility();
+        }
+
+        function scrollToBottom() {
+            const scrollOptions = {
+                top: chatWindow.scrollHeight,
+                behavior: 'smooth'
+            };
+            
+            if (chatWindow.scrollTo) {
+                chatWindow.scrollTo(scrollOptions);
+            } else {
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+
+        // Auto-scroll when new content is added
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length > 0) {
+                    setTimeout(scrollToBottom, 100);
+                }
+            });
+        });
+
+        if (chatWindow) {
+            observer.observe(chatWindow, {
+                childList: true,
+                subtree: true
+            });
+        }
+
+        function openImageModal(src) {
+            modalImage.src = src;
+            imageModal.classList.remove('hidden');
+        }
+
+        function closeImageModal() {
+            imageModal.classList.add('hidden');
+            modalImage.src = "";
+        }
+
+        // --- UTILITY FUNCTIONS ---
+        async function fileToGenerativePart(file, mimeType) {
+            const base64EncodedDataPromise = new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(",")[1]);
+                reader.readAsDataURL(file);
+            });
+            return {
+                inlineData: { data: await base64EncodedDataPromise, mimeType },
+            };
+        }
+
+        // --- EVENT LISTENERS ---
+        activateBtn.addEventListener("click", () => {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                if (!API_KEY) {
+                    API_KEY = key;
+                    localStorage.setItem('jarvis_api_key', API_KEY);
+                    initializeAI(API_KEY);
+                    showAPImodal();
+                } else if (API_KEY && !HF_TOKEN) {
+                    HF_TOKEN = key;
+                    localStorage.setItem('hf_token', HF_TOKEN);
+                    showChat();
+                }
+            }
+        });
+
+        apiKeyInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter" && apiKeyInput.value.trim()) {
+                activateBtn.click();
+            }
+        });
+
+        changeApiBtn.addEventListener("click", clearAPIkey);
+
+        messageInput.addEventListener("input", updateInputAbility);
+        messageInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendButton.disabled) {
+                    sendMessage();
+                }
+            }
+        });
+
+        messageInput.addEventListener("focus", () => {
+            setTimeout(scrollToBottom, 300);
+        });
+
+        sendButton.addEventListener("click", sendMessage);
+        attachButton.addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", handleFileInput);
+        modalClose.addEventListener("click", closeImageModal);
+        imageModal.addEventListener('click', (e) => {
+            if (e.target === imageModal) {
+                closeImageModal();
+            }
+        });
+
+        // Add Clear Chat button to header
+        const header = document.querySelector('header');
+        const clearChatBtn = document.createElement('button');
+        clearChatBtn.textContent = 'Clear Chat';
+        clearChatBtn.className = 'text-sm text-gray-400 hover:text-red-400 transition-colors px-3 py-1 border border-gray-600 rounded-lg ml-2';
+        clearChatBtn.title = 'Clear current chat';
+        clearChatBtn.addEventListener('click', clearChat);
+
+        // Insert before changeApiBtn
+        changeApiBtn.parentNode.insertBefore(clearChatBtn, changeApiBtn);
+
+        // Initial scroll to bottom
+        setTimeout(scrollToBottom, 500);
+    </script> 
+    
+</body>
+  </html>
